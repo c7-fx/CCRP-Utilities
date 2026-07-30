@@ -17,7 +17,7 @@ DATA_FILE      = "bot_state.json"
 intents                 = discord.Intents.all()
 intents.message_content = True
 
-bot           = commands.Bot(command_prefix=".", intents=intents)
+bot           = commands.Bot(command_prefix="-", intents=intents)
 bot.start_time = datetime.datetime.now(datetime.timezone.utc)
 
 # ─── STATE HELPERS ─────────────────────────────────────────────────────────────
