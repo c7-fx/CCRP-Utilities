@@ -9,6 +9,7 @@ import aiohttp
 # ─── CONFIG ────────────────────────────────────────────────────────────────────
 TOKEN          = os.environ["API_KEY"]
 LOG_CHANNEL_ID = 1532239804719173737
+BOT_PREFIX     = os.environ.get("BOT_PREFIX", "-")
 DATA_FILE      = "bot_state.json"
 
 # ─── INTENTS ───────────────────────────────────────────────────────────────────
