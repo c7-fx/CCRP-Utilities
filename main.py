@@ -73,10 +73,56 @@ async def on_ready():
 
     channel = bot.get_channel(LOG_CHANNEL_ID)
     if channel:
-        await channel.send(
-            f"<@703059363312697404> The bot is back online. "
-            f"Synced {synced_count} commands. Previous uptime: {prev_str}."
-        )
+        async with aiohttp.ClientSession() as session:
+            token = bot.http.token
+            # Plain text ping above the embed (content field is allowed on normal messages)
+            payload = {
+                "content": f"<@703059363312697404> The bot is back online.",
+                "flags": 32768,
+                "components": [
+                    {
+                        "type": 17,
+                        "components": [
+                            {
+                                "type": 10,
+                                "content": "**Service Status**\n-# The bot has restarted and is now operational."
+                            },
+                            {"type": 14, "spacing": 1},
+                            {
+                                "type": 1,
+                                "components": [
+                                    {
+                                        "style": 2, "type": 2,
+                                        "label": f"Latency: {round(bot.latency * 1000)}ms",
+                                        "custom_id": "status_latency",
+                                        "disabled": True
+                                    },
+                                    {
+                                        "style": 2, "type": 2,
+                                        "label": f"{synced_count} commands synced",
+                                        "custom_id": "status_synced",
+                                        "disabled": True
+                                    },
+                                    {
+                                        "style": 2, "type": 2,
+                                        "label": f"Previous uptime: {prev_str}",
+                                        "custom_id": "status_uptime",
+                                        "disabled": True
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+            async with session.post(
+                f"https://discord.com/api/v10/channels/{LOG_CHANNEL_ID}/messages",
+                headers={"Authorization": f"Bot {token}", "Content-Type": "application/json"},
+                json=payload,
+            ) as resp:
+                if resp.status not in (200, 201):
+                    text = await resp.text()
+                    print(f"❌ Failed to send online status: {resp.status}: {text}")
 
 
 @bot.event
@@ -88,7 +134,7 @@ async def on_disconnect():
 @commands.cooldown(1, 5, commands.BucketType.user)
 async def ping(ctx: commands.Context):
     latency = round(bot.latency * 1000)
-    await ctx.reply(f"The average bot latency is **{latency}ms.**")
+    await ctx.reply(f"Average latency is **{latency}ms.**")
 
 @ping.error
 async def ping_error(ctx: commands.Context, error):
