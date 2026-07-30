@@ -80,7 +80,7 @@ async def on_disconnect():
 @bot.command()
 async def ping(ctx: commands.Context):
     latency = round(bot.latency * 1000)
-    await ctx.reply(f"Average latency is **{latency}ms.**")
+    await ctx.reply(f"The average bot latency is **{latency}ms.**")
 
 # ─── STARTUP ───────────────────────────────────────────────────────────────────
 async def main():
