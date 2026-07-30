@@ -116,7 +116,7 @@ def faq_payload() -> dict:
                 "components": [
                     {
                         "type": 12,
-                        "items": [{"media": {"url": FAQ_HEADER}, "spoiler": True}]
+                        "items": [{"media": {"url": FAQ_HEADER}, "spoiler": False}]
                     },
                     {"type": 14, "spacing": 2},
                     {
@@ -146,7 +146,7 @@ def faq_payload() -> dict:
     }
 
 
-def ticket_panel_payload(ticket_type: str, description: str, proof_url: str | None) -> dict:
+def ticket_panel_payload(ticket_type: str, description: str | None) -> dict:
     full_name = TICKET_TYPES[ticket_type]["label"]
     inner = [
         {"type": 10, "content": f"# {full_name} Ticket"},
@@ -175,8 +175,6 @@ def ticket_panel_payload(ticket_type: str, description: str, proof_url: str | No
         {"type": 10, "content": description},
     ]
 
-    if proof_url:
-        inner.append({"type": 12, "items": [{"media": {"url": proof_url}}]})
 
     inner += [
         {"type": 14, "spacing": 2},
@@ -267,9 +265,8 @@ def closure_request_disabled_payload() -> dict:
     }
 
 
-def log_open_payload(user: discord.Member, ticket_ch: discord.TextChannel, full_name: str, reason: str, proof_url: str | None) -> dict:
+def log_open_payload(user: discord.Member, ticket_ch: discord.TextChannel, full_name: str, reason: str | None) -> dict:
     unix_now   = int(time.time())
-    proof_line = f"\n> **Proof:** {proof_url}" if proof_url else ""
     return {
         "flags": 32768,
         "allowed_mentions": {"parse": []},
@@ -362,13 +359,6 @@ class TicketModal(discord.ui.Modal):
         max_length=1000,
         required=True,
     )
-    proof_url = discord.ui.TextInput(
-        label="Proof URL (optional)",
-        style=discord.TextStyle.short,
-        placeholder="Paste a direct image/video URL if you have proof",
-        required=False,
-        max_length=500,
-    )
 
     def __init__(self, ticket_type: str, cog: "Tickets"):
         super().__init__(title=f"Open {TICKET_TYPES[ticket_type]['label']} Ticket")
@@ -381,7 +371,6 @@ class TicketModal(discord.ui.Modal):
             interaction,
             self.ticket_type,
             self.reason.value.strip(),
-            self.proof_url.value.strip() or None,
         )
 
 
@@ -489,7 +478,7 @@ class Tickets(commands.Cog):
         self._cooldowns[user_id] = time.monotonic()
 
     # ── Create ticket ──────────────────────────────────────────────────────────
-    async def create_ticket(self, interaction: Interaction, ticket_type: str, reason: str, proof_url: str | None):
+    async def create_ticket(self, interaction: Interaction, ticket_type: str, reason: str | None):
         user  = interaction.user
         guild = interaction.guild
 
@@ -551,7 +540,7 @@ class Tickets(commands.Cog):
             return
 
         try:
-            await self.raw_send(ticket_ch.id, ticket_panel_payload(ticket_type, reason, proof_url))
+            await self.raw_send(ticket_ch.id, ticket_panel_payload(ticket_type, reason))
         except RuntimeError as e:
             await interaction.followup.send(f"Failed to post ticket panel: {e}", ephemeral=True)
             return
@@ -562,7 +551,7 @@ class Tickets(commands.Cog):
 
         if log_ch:
             try:
-                await self.raw_send(log_ch.id, log_open_payload(user, ticket_ch, full_name, reason, proof_url))
+                await self.raw_send(log_ch.id, log_open_payload(user, ticket_ch, full_name, reason))
             except RuntimeError as e:
                 print(f"[Tickets] Failed to send open log: {e}")
 
