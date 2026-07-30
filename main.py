@@ -71,6 +71,13 @@ async def on_ready():
     prev_str    = format_duration(prev_uptime) if prev_uptime else "Unknown (First Start)"
     save_state(bot.start_time)
 
+    channel = bot.get_channel(LOG_CHANNEL_ID)
+    if channel:
+        await channel.send(
+            f"<@703059363312697404> The bot is back online. "
+            f"Synced {synced_count} commands. Previous uptime: {prev_str}."
+        )
+
 
 @bot.event
 async def on_disconnect():
@@ -78,9 +85,15 @@ async def on_disconnect():
 
 # ─── PING COMMAND ──────────────────────────────────────────────────────────────
 @bot.command()
+@commands.cooldown(1, 5, commands.BucketType.user)
 async def ping(ctx: commands.Context):
     latency = round(bot.latency * 1000)
     await ctx.reply(f"The average bot latency is **{latency}ms.**")
+
+@ping.error
+async def ping_error(ctx: commands.Context, error):
+    if isinstance(error, commands.CommandOnCooldown):
+        await ctx.reply(f"You are on cooldown. Try again in {error.retry_after:.1f}s.")
 
 # ─── STARTUP ───────────────────────────────────────────────────────────────────
 async def main():
