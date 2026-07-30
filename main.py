@@ -79,7 +79,7 @@ async def on_ready():
             async with session.post(
                 f"https://discord.com/api/v10/channels/{LOG_CHANNEL_ID}/messages",
                 headers={"Authorization": f"Bot {token}", "Content-Type": "application/json"},
-                json={"content": "-# <@703059363312697404> | <@&1532239870792044544>"},
+                json={"content": "-# <@703059363312697404>  |  <@&1532239870792044544>"},
             ) as resp:
                 if resp.status not in (200, 201):
                     text = await resp.text()
