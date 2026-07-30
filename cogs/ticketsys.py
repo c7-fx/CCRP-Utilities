@@ -14,160 +14,24 @@ TICKET_CATEGORY_ID = 1532487653159866429
 TICKET_LOG_CHANNEL = 1532488621699895396
 TICKET_COOLDOWN_S  = 120  # 2 minutes
 
-# Roles that can see every ticket (add your staff role IDs here)
+# Roles that can see every ticket
 STAFF_ROLE_IDS: list[int] = [1532239870792044544]
 
-# ── Banner URLs — change these to update all embeds at once ──────────────────
 BANNER_HEADER = "https://media.discordapp.net/attachments/1516926965674807443/1521022722057175040/4.png?ex=6a6cd98c&is=6a6b880c&hm=cdbd3c02d0665483563b1c3cf95fee576ae20f96073134d9bbeecfc22c39e161&format=webp&quality=lossless&width=1775&height=533&"
 BANNER_FOOTER = "https://media.discordapp.net/attachments/1516926965674807443/1521022754734997545/14.png?ex=6a6cd993&is=6a6b8813&hm=17bf065053eb6f558c3814703bdf558daf94f07c739fc22f7d0184a401161188&format=webp&quality=lossless&width=1775&height=133&"
+FAQ_HEADER    = "https://media.discordapp.net/attachments/1516926965674807443/1525366046826172628/PLACEHOLDER.png?ex=6a6cd495&is=6a6b8315&hm=d53cb68331bc3be4e31bc7bd5fc284e39406c95639ec30617286522f4d0cab9b&=&format=webp&quality=lossless&width=1600&height=480"
 
 TICKET_TYPES = {
-    "general": {"label": "General",          "short": "gen"},
-    "department":      {"label": "Department", "short": "dept"},
-    "management":      {"label": "Management", "short": "mgmt"},
+    "general":    {"label": "General",    "short": "gen"},
+    "department": {"label": "Department", "short": "dept"},
+    "management": {"label": "Management", "short": "mgmt"},
 }
-
-# ─── HELPERS ───────────────────────────────────────────────────────────────────
-def strip_link_custom_ids(components: list) -> list:
-    """Recursively remove custom_id from style-5 (link) buttons."""
-    cleaned = []
-    for component in components:
-        c = dict(component)
-        if "components" in c:
-            c["components"] = strip_link_custom_ids(c["components"])
-        if "accessory" in c and isinstance(c["accessory"], dict):
-            acc = dict(c["accessory"])
-            if acc.get("type") == 2 and acc.get("style") == 5:
-                acc.pop("custom_id", None)
-            c["accessory"] = acc
-        if c.get("type") == 2 and c.get("style") == 5:
-            c.pop("custom_id", None)
-        cleaned.append(c)
-    return cleaned
-
-
-
-# ─── LOG PAYLOADS ──────────────────────────────────────────────────────────────
-def log_open_payload(
-    user: discord.Member,
-    ticket_ch: discord.TextChannel,
-    full_name: str,
-    reason: str,
-    proof_url: str | None,
-) -> dict:
-    unix_now   = int(time.time())
-    proof_line = f"\n> **Proof:** {proof_url}" if proof_url else ""
-
-    return {
-        "flags": 32768,
-        "allowed_mentions": {"parse": []},
-        "components": [
-            {
-                "type": 17,
-                "components": [
-                    {
-                        "type": 10,
-                        "content": (
-                            f"## 📂  Ticket Opened\n"
-                            f"> **Channel:** <#{ticket_ch.id}> — `{ticket_ch.name}`\n"
-                            f"> **Opened by:** <@{user.id}> — `{user}` (`{user.id}`)\n"
-                            f"> **Type:** {full_name}\n"
-                            f"> **Opened:** <t:{unix_now}:F>\n"
-                            f"### Reason\n"
-                            f"```\n{reason}\n```"
-                            f"{proof_line}"
-                        )
-                    },
-                    {"type": 14, "spacing": 1},
-                    {
-                        "type": 12,
-                        "items": [{"media": {"url": BANNER_FOOTER}}]
-                    }
-                ]
-            }
-        ]
-    }
-
-
-def log_close_payload(
-    closer: discord.Member,
-    channel_name: str,
-    reason_str: str,
-    message_count: int,
-) -> dict:
-    unix_now = int(time.time())
-
-    return {
-        "flags": 32768,
-        "allowed_mentions": {"parse": []},
-        "components": [
-            {
-                "type": 17,
-                "components": [
-                    {
-                        "type": 10,
-                        "content": (
-                            f"## 🔒  Ticket Closed\n"
-                            f"> **Channel:** `{channel_name}`\n"
-                            f"> **Closed by:** <@{closer.id}> — `{closer}` (`{closer.id}`)\n"
-                            f"> **Messages in transcript:** {message_count}\n"
-                            f"> **Closed:** <t:{unix_now}:F>\n"
-                            f"### Closure Reason\n"
-                            f"```\n{reason_str}\n```"
-                        )
-                    },
-                    {"type": 14, "spacing": 1},
-                    {
-                        "type": 12,
-                        "items": [{"media": {"url": BANNER_FOOTER}}]
-                    }
-                ]
-            }
-        ]
-    }
-
-
-async def build_transcript(channel: discord.TextChannel) -> tuple[io.BytesIO, int]:
-    """
-    Fetch all non-bot messages from the channel, format them into a plain
-    text transcript, and return a BytesIO buffer + the message count.
-    """
-    lines: list[str] = []
-    lines.append(f"TICKET TRANSCRIPT — #{channel.name}")
-    lines.append(f"Generated: {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}")
-    lines.append("=" * 60)
-    lines.append("")
-
-    messages: list[discord.Message] = []
-    async for msg in channel.history(limit=None, oldest_first=True):
-        if not msg.author.bot:
-            messages.append(msg)
-
-    for msg in messages:
-        ts        = msg.created_at.strftime("%Y-%m-%d %H:%M:%S UTC")
-        author    = f"{msg.author} ({msg.author.id})"
-        content   = msg.content or "(no text content)"
-        attachments = (
-            "\n  ".join(a.url for a in msg.attachments)
-            if msg.attachments else ""
-        )
-
-        lines.append(f"[{ts}] {author}")
-        lines.append(f"  {content}")
-        if attachments:
-            lines.append(f"  Attachments:\n  {attachments}")
-        lines.append("")
-
-    buf = io.BytesIO("\n".join(lines).encode("utf-8"))
-    buf.seek(0)
-    return buf, len(messages)
 
 
 # ─── PAYLOADS ──────────────────────────────────────────────────────────────────
 def support_panel_payload() -> dict:
-    raw = {
+    return {
         "flags": 32768,
-        "allowed_mentions": {"parse": []},
         "components": [
             {
                 "type": 17,
@@ -177,26 +41,60 @@ def support_panel_payload() -> dict:
                         "items": [{"media": {"url": BANNER_HEADER}}]
                     },
                     {"type": 14, "spacing": 2},
-                    {"type": 10, "content": "# Support System"},
                     {
-                        "type": 9,
-                        "components": [{"type": 10, "content": "**General**\n-# *For simple questions or low urgency matters*"}],
-                        "accessory": {
-                            "style": 2, "type": 2,
-                            "disabled": False,
-                            "custom_id": "ticket_open_general",
-                            "label": "Open"
-                        }
+                        "type": 10,
+                        "content": "> Welcome to our ticket system. Here, we are dedicated to give you a fun, unforgettable and exciting experience. To do that, our friendly staff team is here to help you with any of your needs. Please open a ticket relating to your issue below."
+                    },
+                    {"type": 14, "spacing": 2},
+                    {
+                        "type": 10,
+                        "content": (
+                            "<:ticket1:1532492550949175376> — When should I open a **General Ticket?**\n"
+                            "-# ・Inquiries\n-# ・Quick Fixes\n-# ・Concerns\n\n"
+                            "<:ticket2:1532492549409738932> — When should I open a **Department Ticket?**\n"
+                            "-# ・Reporting a department administrator\n-# ・Department inquiries\n-# ・Department feedback\n\n"
+                            "<:ticket3:1532492548399169707> — When should I open a **Management Ticket?**\n"
+                            "-# ・Reporting Staff\n-# ・Reporting another member\n-# ・Claiming Purchases"
+                        )
                     },
                     {
-                        "type": 9,
-                        "components": [{"type": 10, "content": "**Internal Affairs**\n-# *For staff reports or member reports*"}],
-                        "accessory": {
-                            "style": 2, "type": 2,
-                            "disabled": False,
-                            "custom_id": "ticket_open_ia",
-                            "label": "Open"
-                        }
+                        "type": 1,
+                        "components": [
+                            {
+                                "style": 2, "type": 2,
+                                "label": "Frequently Asked Questions",
+                                "emoji": {"id": "1532494447261253812", "name": "chat", "animated": False},
+                                "custom_id": "ticket_faq"
+                            }
+                        ]
+                    },
+                    {"type": 14, "spacing": 2},
+                    {
+                        "type": 10,
+                        "content": "**Open a Ticket**\n-# Select from one of the options to continue"
+                    },
+                    {
+                        "type": 1,
+                        "components": [
+                            {
+                                "style": 2, "type": 2,
+                                "label": "General",
+                                "emoji": {"id": "1532492550949175376", "name": "ticket1", "animated": False},
+                                "custom_id": "ticket_open_general"
+                            },
+                            {
+                                "style": 2, "type": 2,
+                                "label": "Department",
+                                "emoji": {"id": "1532492549409738932", "name": "ticket2", "animated": False},
+                                "custom_id": "ticket_open_department"
+                            },
+                            {
+                                "style": 2, "type": 2,
+                                "label": "Management",
+                                "emoji": {"id": "1532492548399169707", "name": "ticket3", "animated": False},
+                                "custom_id": "ticket_open_management"
+                            }
+                        ]
                     },
                     {"type": 14, "spacing": 2},
                     {
@@ -207,19 +105,56 @@ def support_panel_payload() -> dict:
             }
         ]
     }
-    raw["components"] = strip_link_custom_ids(raw["components"])
-    return raw
 
 
-def ticket_panel_payload(description: str, proof_url: str | None) -> dict:
+def faq_payload() -> dict:
+    return {
+        "flags": 32768 | 64,  # ephemeral
+        "components": [
+            {
+                "type": 17,
+                "components": [
+                    {
+                        "type": 12,
+                        "items": [{"media": {"url": FAQ_HEADER}, "spoiler": True}]
+                    },
+                    {"type": 14, "spacing": 2},
+                    {
+                        "type": 10,
+                        "content": "> Welcome to our FAQ! Below are answers to some of the questions we receive most frequently. If you can't find the information you're looking for, please open a ticket and our team will be happy to assist you as soon as possible."
+                    },
+                    {"type": 14, "spacing": 2},
+                    {
+                        "type": 10,
+                        "content": (
+                            "・We are **not** looking for partnerships, if we are interested in partnering with your server we will come to you.\n"
+                            "・We do **not** need department heads/HR's and we are not looking to open any departments; this includes civilian operations. If we are in need of someone to step up to department leadership, you will be notified in <#1516926964319911954>.\n"
+                            "・We do **not** moderate users, unless it poses a direct impact on Coast City Roleplay. Meaning, we do not do blacklists. \n"
+                            "・We are **not** accepting staff transfers unless you are coming from a server with over 1,000+ members. \n"
+                            "・We do **not** accept staff bypass applications, unless otherwise stated.\n\n"
+                            "**⚠️ Opening a ticket asking about any stated questions above will result in moderation.**"
+                        )
+                    },
+                    {"type": 14, "spacing": 2},
+                    {
+                        "type": 12,
+                        "items": [{"media": {"url": BANNER_FOOTER}}]
+                    }
+                ]
+            }
+        ]
+    }
+
+
+def ticket_panel_payload(ticket_type: str, description: str, proof_url: str | None) -> dict:
+    full_name = TICKET_TYPES[ticket_type]["label"]
     inner = [
-        {"type": 10, "content": "# Ticket Management Panel"},
+        {"type": 10, "content": f"# {full_name} Ticket"},
         {
             "type": 9,
-            "components": [{"type": 10, "content": "**Close Ticket**\n-# *Close the ticket immediately with an optional reason*"}],
+            "components": [{"type": 10, "content": "**Close Ticket**\n-# *Close the ticket with an optional reason*"}],
             "accessory": {
                 "style": 2, "type": 2,
-                "emoji": {"name": "🔒"},
                 "disabled": False,
                 "custom_id": "ticket_close"
             }
@@ -229,7 +164,6 @@ def ticket_panel_payload(description: str, proof_url: str | None) -> dict:
             "components": [{"type": 10, "content": "**Request Ticket Closure**\n-# *Request to close the ticket*"}],
             "accessory": {
                 "style": 2, "type": 2,
-                "emoji": {"name": "📩"},
                 "disabled": False,
                 "custom_id": "ticket_request_close"
             }
@@ -240,25 +174,21 @@ def ticket_panel_payload(description: str, proof_url: str | None) -> dict:
     ]
 
     if proof_url:
-        inner.append({
-            "type": 12,
-            "items": [{"media": {"url": proof_url}}]
-        })
+        inner.append({"type": 12, "items": [{"media": {"url": proof_url}}]})
 
     inner += [
         {"type": 14, "spacing": 2},
-        {
-            "type": 12,
-            "items": [{"media": {"url": BANNER_FOOTER}}]
-        }
+        {"type": 12, "items": [{"media": {"url": BANNER_FOOTER}}]}
     ]
 
-    return {"flags": 32768,
-        "allowed_mentions": {"parse": []}, "components": [{"type": 17, "components": inner}]}
+    return {
+        "flags": 32768,
+        "allowed_mentions": {"parse": []},
+        "components": [{"type": 17, "components": inner}]
+    }
 
 
 def closure_request_payload(req_message: str) -> dict:
-    """V2 embed posted when a user requests ticket closure."""
     return {
         "flags": 32768,
         "allowed_mentions": {"parse": []},
@@ -272,7 +202,6 @@ def closure_request_payload(req_message: str) -> dict:
                         "components": [{"type": 10, "content": "**Close Ticket**\n-# *Accept the closure request*"}],
                         "accessory": {
                             "style": 2, "type": 2,
-                            "emoji": {"name": "✅"},
                             "disabled": False,
                             "custom_id": "ticket_close_accept"
                         }
@@ -282,7 +211,6 @@ def closure_request_payload(req_message: str) -> dict:
                         "components": [{"type": 10, "content": "**Deny Request**\n-# *Deny the closure request*"}],
                         "accessory": {
                             "style": 2, "type": 2,
-                            "emoji": {"name": "🔒"},
                             "disabled": False,
                             "custom_id": "ticket_close_deny"
                         }
@@ -291,18 +219,14 @@ def closure_request_payload(req_message: str) -> dict:
                     {"type": 10, "content": "**Request Message**"},
                     {"type": 10, "content": req_message},
                     {"type": 14, "spacing": 2},
-                    {
-                        "type": 12,
-                        "items": [{"media": {"url": BANNER_FOOTER}}]
-                    }
+                    {"type": 12, "items": [{"media": {"url": BANNER_FOOTER}}]}
                 ]
             }
         ]
     }
 
 
-def closure_request_payload_disabled() -> dict:
-    """Same embed as closure_request_payload but with both buttons disabled."""
+def closure_request_disabled_payload() -> dict:
     return {
         "flags": 32768,
         "allowed_mentions": {"parse": []},
@@ -316,7 +240,7 @@ def closure_request_payload_disabled() -> dict:
                         "components": [{"type": 10, "content": "**Close Ticket**\n-# *Accept the closure request*"}],
                         "accessory": {
                             "style": 2, "type": 2,
-                            "emoji": {"name": "✅"},
+                            
                             "disabled": True,
                             "custom_id": "ticket_close_accept"
                         }
@@ -326,7 +250,6 @@ def closure_request_payload_disabled() -> dict:
                         "components": [{"type": 10, "content": "**Deny Request**\n-# *Deny the closure request*"}],
                         "accessory": {
                             "style": 2, "type": 2,
-                            "emoji": {"name": "🔒"},
                             "disabled": True,
                             "custom_id": "ticket_close_deny"
                         }
@@ -335,17 +258,99 @@ def closure_request_payload_disabled() -> dict:
                     {"type": 10, "content": "**Request Message**"},
                     {"type": 10, "content": "*(Request denied)*"},
                     {"type": 14, "spacing": 2},
-                    {
-                        "type": 12,
-                        "items": [{"media": {"url": BANNER_FOOTER}}]
-                    }
+                    {"type": 12, "items": [{"media": {"url": BANNER_FOOTER}}]}
                 ]
             }
         ]
     }
 
 
+def log_open_payload(user: discord.Member, ticket_ch: discord.TextChannel, full_name: str, reason: str, proof_url: str | None) -> dict:
+    unix_now   = int(time.time())
+    proof_line = f"\n> **Proof:** {proof_url}" if proof_url else ""
+    return {
+        "flags": 32768,
+        "allowed_mentions": {"parse": []},
+        "components": [
+            {
+                "type": 17,
+                "components": [
+                    {
+                        "type": 10,
+                        "content": (
+                            f"## Ticket Opened\n"
+                            f"> **Channel:** <#{ticket_ch.id}> — `{ticket_ch.name}`\n"
+                            f"> **Opened by:** <@{user.id}> — `{user}` (`{user.id}`)\n"
+                            f"> **Type:** {full_name}\n"
+                            f"> **Opened:** <t:{unix_now}:F>\n"
+                            f"### Reason\n```\n{reason}\n```"
+                            f"{proof_line}"
+                        )
+                    },
+                    {"type": 14, "spacing": 1},
+                    {"type": 12, "items": [{"media": {"url": BANNER_FOOTER}}]}
+                ]
+            }
+        ]
+    }
 
+
+def log_close_payload(closer: discord.Member, channel_name: str, reason_str: str, message_count: int) -> dict:
+    unix_now = int(time.time())
+    return {
+        "flags": 32768,
+        "allowed_mentions": {"parse": []},
+        "components": [
+            {
+                "type": 17,
+                "components": [
+                    {
+                        "type": 10,
+                        "content": (
+                            f"## Ticket Closed\n"
+                            f"> **Channel:** `{channel_name}`\n"
+                            f"> **Closed by:** <@{closer.id}> — `{closer}` (`{closer.id}`)\n"
+                            f"> **Messages in transcript:** {message_count}\n"
+                            f"> **Closed:** <t:{unix_now}:F>\n"
+                            f"### Closure Reason\n```\n{reason_str}\n```"
+                        )
+                    },
+                    {"type": 14, "spacing": 1},
+                    {"type": 12, "items": [{"media": {"url": BANNER_FOOTER}}]}
+                ]
+            }
+        ]
+    }
+
+
+# ─── TRANSCRIPT ────────────────────────────────────────────────────────────────
+async def build_transcript(channel: discord.TextChannel) -> tuple[io.BytesIO, int]:
+    lines = [
+        f"TICKET TRANSCRIPT — #{channel.name}",
+        f"Generated: {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}",
+        "=" * 60,
+        "",
+    ]
+    messages: list[discord.Message] = []
+    async for msg in channel.history(limit=None, oldest_first=True):
+        if not msg.author.bot:
+            messages.append(msg)
+
+    for msg in messages:
+        ts   = msg.created_at.strftime("%Y-%m-%d %H:%M:%S UTC")
+        auth = f"{msg.author} ({msg.author.id})"
+        lines.append(f"[{ts}] {auth}")
+        lines.append(f"  {msg.content or '(no text content)'}")
+        if msg.attachments:
+            lines.append("  Attachments:\n  " + "\n  ".join(a.url for a in msg.attachments))
+        lines.append("")
+
+    buf = io.BytesIO("\n".join(lines).encode("utf-8"))
+    buf.seek(0)
+    return buf, len(messages)
+
+
+# ─── MODALS ────────────────────────────────────────────────────────────────────
 class TicketModal(discord.ui.Modal):
     reason = discord.ui.TextInput(
         label="Reason",
@@ -412,20 +417,18 @@ class RequestCloseModal(discord.ui.Modal, title="Request Ticket Closure"):
     async def on_submit(self, interaction: Interaction):
         await interaction.response.defer(ephemeral=True)
         req_message = self.reason.value.strip() or "No reason provided."
-        payload = closure_request_payload(req_message)
         try:
-            await self.cog.raw_send(interaction.channel_id, payload)
-            await interaction.followup.send("✅ Closure request sent.", ephemeral=True)
+            await self.cog.raw_send(interaction.channel_id, closure_request_payload(req_message))
+            await interaction.followup.send("Closure request sent.", ephemeral=True)
         except RuntimeError as e:
-            await interaction.followup.send(f"❌ Failed to send request: {e}", ephemeral=True)
+            await interaction.followup.send(f"Failed to send request: {e}", ephemeral=True)
 
 
 # ─── COG ───────────────────────────────────────────────────────────────────────
 class Tickets(commands.Cog):
     def __init__(self, bot: commands.Bot):
-        self.bot     = bot
+        self.bot        = bot
         self.session: aiohttp.ClientSession | None = None
-        # user_id -> unix timestamp of last ticket open
         self._cooldowns: dict[int, float] = {}
 
     async def cog_load(self):
@@ -449,7 +452,6 @@ class Tickets(commands.Cog):
             import json as _json
             return _json.loads(text)
 
-    # ── Raw REST edit ─────────────────────────────────────────────────────────
     async def raw_edit(self, channel_id: int, message_id: int, payload: dict):
         token = self.bot.http.token
         async with self.session.patch(
@@ -461,9 +463,19 @@ class Tickets(commands.Cog):
                 text = await resp.text()
                 raise RuntimeError(f"Discord API {resp.status}: {text}")
 
-    # ── Cooldown check ─────────────────────────────────────────────────────────
+    async def raw_interaction_reply(self, interaction: Interaction, payload: dict):
+        token = self.bot.http.token
+        async with self.session.post(
+            f"https://discord.com/api/v10/interactions/{interaction.id}/{interaction.token}/callback",
+            headers={"Authorization": f"Bot {token}", "Content-Type": "application/json"},
+            json={"type": 4, "data": payload},
+        ) as resp:
+            if resp.status not in (200, 201, 204):
+                text = await resp.text()
+                raise RuntimeError(f"Interaction reply failed {resp.status}: {text}")
+
+    # ── Cooldown ───────────────────────────────────────────────────────────────
     def check_cooldown(self, user_id: int) -> float | None:
-        """Returns seconds remaining if on cooldown, else None."""
         last = self._cooldowns.get(user_id)
         if last is None:
             return None
@@ -474,17 +486,10 @@ class Tickets(commands.Cog):
         self._cooldowns[user_id] = time.monotonic()
 
     # ── Create ticket ──────────────────────────────────────────────────────────
-    async def create_ticket(
-        self,
-        interaction: Interaction,
-        ticket_type: str,
-        reason: str,
-        proof_url: str | None,
-    ):
+    async def create_ticket(self, interaction: Interaction, ticket_type: str, reason: str, proof_url: str | None):
         user  = interaction.user
         guild = interaction.guild
 
-        # ── Cooldown guard ──
         remaining = self.check_cooldown(user.id)
         if remaining is not None:
             await interaction.followup.send(
@@ -500,29 +505,19 @@ class Tickets(commands.Cog):
         ch_name   = f"{short}-{user.name[:5].lower()}"
 
         if category is None:
-            await interaction.followup.send(
-                "❌ Ticket category not found. Please contact an administrator.",
-                ephemeral=True,
-            )
+            await interaction.followup.send("Ticket category not found. Please contact an administrator.", ephemeral=True)
             return
 
-        # ── Permissions ──
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            user: discord.PermissionOverwrite(
-                view_channel=True,
-                send_messages=True,
-                read_message_history=True,
-            ),
+            user: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
         }
         for role_id in STAFF_ROLE_IDS:
             role = guild.get_role(role_id)
             if role:
                 overwrites[role] = discord.PermissionOverwrite(
-                    view_channel=True,
-                    send_messages=True,
-                    read_message_history=True,
-                    manage_channels=True,
+                    view_channel=True, send_messages=True,
+                    read_message_history=True, manage_channels=True,
                 )
 
         try:
@@ -533,39 +528,27 @@ class Tickets(commands.Cog):
                 topic=f"{full_name} ticket — opened by {user} ({user.id})",
             )
         except discord.Forbidden:
-            await interaction.followup.send(
-                "❌ I don't have permission to create channels in that category.",
-                ephemeral=True,
-            )
+            await interaction.followup.send("I don't have permission to create channels in that category.", ephemeral=True)
             return
 
-        # ── Post V2 panel embed ──
         try:
-            await self.raw_send(ticket_ch.id, ticket_panel_payload(reason, proof_url))
+            await self.raw_send(ticket_ch.id, ticket_panel_payload(ticket_type, reason, proof_url))
         except RuntimeError as e:
-            await interaction.followup.send(f"❌ Failed to post ticket panel: {e}", ephemeral=True)
+            await interaction.followup.send(f"Failed to post ticket panel: {e}", ephemeral=True)
             return
 
-        # ── Ping opener ──
         await ticket_ch.send(
-            f"{user.mention} <@&1484028039179534367> — your **{full_name}** ticket has been opened. "
-            f"Staff will be with you shortly."
+            f"{user.mention} — your **{full_name}** ticket has been opened. Staff will be with you shortly."
         )
 
-        # ── Log ticket open ──
         if log_ch:
             try:
                 await self.raw_send(log_ch.id, log_open_payload(user, ticket_ch, full_name, reason, proof_url))
             except RuntimeError as e:
                 print(f"[Tickets] Failed to send open log: {e}")
 
-        # ── Set cooldown after successful open ──
         self.set_cooldown(user.id)
-
-        await interaction.followup.send(
-            f"✅ Your ticket has been opened: {ticket_ch.mention}",
-            ephemeral=True,
-        )
+        await interaction.followup.send(f"Your ticket has been opened: {ticket_ch.mention}", ephemeral=True)
 
     # ── Close ticket ───────────────────────────────────────────────────────────
     async def close_ticket(self, interaction: Interaction, reason: str | None):
@@ -575,26 +558,17 @@ class Tickets(commands.Cog):
         reason_str = reason or "No reason provided."
 
         await channel.send(
-            f"🔒 This ticket is being closed by {closer.mention}.\n"
+            f"This ticket is being closed by {closer.mention}.\n"
             f"**Reason:** {reason_str}\n"
             f"-# Generating transcript…"
         )
 
-        # ── Build transcript before deleting ──
         transcript_buf, msg_count = await build_transcript(channel)
-        transcript_file = discord.File(
-            transcript_buf,
-            filename=f"transcript-{channel.name}.txt",
-        )
 
-        # ── Send clean V2 log embed + transcript file ──
         if log_ch:
             try:
-                await self.raw_send(
-                    log_ch.id,
-                    log_close_payload(closer, channel.name, reason_str, msg_count),
-                )
-                await log_ch.send(file=transcript_file)
+                await self.raw_send(log_ch.id, log_close_payload(closer, channel.name, reason_str, msg_count))
+                await log_ch.send(file=discord.File(transcript_buf, filename=f"transcript-{channel.name}.txt"))
             except RuntimeError as e:
                 print(f"[Tickets] Failed to send close log: {e}")
 
@@ -603,9 +577,7 @@ class Tickets(commands.Cog):
         try:
             await channel.delete(reason=f"Ticket closed by {closer}: {reason_str}")
         except discord.Forbidden:
-            await interaction.followup.send(
-                "❌ I don't have permission to delete this channel.", ephemeral=True
-            )
+            await interaction.followup.send("I don't have permission to delete this channel.", ephemeral=True)
 
     # ── Interaction router ─────────────────────────────────────────────────────
     @commands.Cog.listener()
@@ -615,61 +587,57 @@ class Tickets(commands.Cog):
 
         cid = interaction.data.get("custom_id", "")
 
-        if cid == "ticket_open_general":
-            await interaction.response.send_modal(TicketModal("general", self))
+        # ── FAQ ──
+        if cid == "ticket_faq":
+            try:
+                await self.raw_interaction_reply(interaction, faq_payload())
+            except RuntimeError as e:
+                print(f"[Tickets] FAQ reply failed: {e}")
 
-        elif cid == "ticket_open_ia":
-            await interaction.response.send_modal(TicketModal("ia", self))
+        # ── Open ticket buttons ──
+        elif cid in ("ticket_open_general", "ticket_open_department", "ticket_open_management"):
+            ticket_type = cid.replace("ticket_open_", "")
+            await interaction.response.send_modal(TicketModal(ticket_type, self))
 
-        elif cid == "ticket_open_mgmt":
-            await interaction.response.send_modal(TicketModal("mgmt", self))
-
+        # ── Close ticket ──
         elif cid == "ticket_close":
             await interaction.response.send_modal(CloseTicketModal(self))
 
+        # ── Request close ──
         elif cid == "ticket_request_close":
             await interaction.response.send_modal(RequestCloseModal(self))
 
+        # ── Accept closure request ──
         elif cid == "ticket_close_accept":
-            # Any staff / the original opener clicking accept on the request embed
             await interaction.response.defer(ephemeral=True)
             await self.close_ticket(interaction, "Closure request accepted.")
 
+        # ── Deny closure request ──
         elif cid == "ticket_close_deny":
             await interaction.response.defer(ephemeral=True)
-            # Rebuild the closure request embed with both buttons disabled
-            msg     = interaction.message
-            payload = closure_request_payload_disabled()
             try:
-                await self.raw_edit(interaction.channel_id, msg.id, payload)
+                await self.raw_edit(interaction.channel_id, interaction.message.id, closure_request_disabled_payload())
             except RuntimeError as e:
-                await interaction.followup.send(f"❌ Failed to update embed: {e}", ephemeral=True)
+                await interaction.followup.send(f"Failed to update embed: {e}", ephemeral=True)
                 return
-            await interaction.channel.send(
-                f"❌ {interaction.user.mention} denied the closure request."
-            )
+            await interaction.channel.send(f"{interaction.user.mention} denied the closure request.")
             await interaction.followup.send("Done.", ephemeral=True)
 
     # ── Slash command ──────────────────────────────────────────────────────────
-    @app_commands.command(
-        name="ticketpanel",
-        description="Post the support ticket panel in this channel.",
-    )
+    @app_commands.command(name="ticketpanel", description="Post the support ticket panel in this channel.")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def ticket_panel(self, interaction: Interaction):
         await interaction.response.defer(ephemeral=True)
         try:
             await self.raw_send(interaction.channel_id, support_panel_payload())
-            await interaction.followup.send("✅ Ticket panel posted!", ephemeral=True)
+            await interaction.followup.send("Ticket panel posted!", ephemeral=True)
         except RuntimeError as e:
-            await interaction.followup.send(f"❌ Failed to post panel:\n```{e}```", ephemeral=True)
+            await interaction.followup.send(f"Failed to post panel:\n```{e}```", ephemeral=True)
 
     @ticket_panel.error
     async def ticket_panel_error(self, interaction: Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.MissingPermissions):
-            await interaction.response.send_message(
-                "❌ You need **Manage Server** to use this command.", ephemeral=True
-            )
+            await interaction.response.send_message("You need **Manage Server** to use this command.", ephemeral=True)
 
 
 # ─── SETUP ─────────────────────────────────────────────────────────────────────
