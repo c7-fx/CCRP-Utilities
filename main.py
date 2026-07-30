@@ -75,9 +75,16 @@ async def on_ready():
     if channel:
         async with aiohttp.ClientSession() as session:
             token = bot.http.token
-            # Plain text ping above the embed (content field is allowed on normal messages)
+            # Send the plain text ping as a separate message first
+            async with session.post(
+                f"https://discord.com/api/v10/channels/{LOG_CHANNEL_ID}/messages",
+                headers={"Authorization": f"Bot {token}", "Content-Type": "application/json"},
+                json={"content": "<@703059363312697404> The bot is back online."},
+            ) as resp:
+                if resp.status not in (200, 201):
+                    text = await resp.text()
+                    print(f"❌ Failed to send ping message: {resp.status}: {text}")
             payload = {
-                "content": f"<@703059363312697404> The bot is back online.",
                 "flags": 32768,
                 "components": [
                     {
