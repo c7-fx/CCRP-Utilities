@@ -11,7 +11,7 @@ from discord.ext import commands
 
 # ─── CONFIG ────────────────────────────────────────────────────────────────────
 TICKET_CATEGORY_ID = 1532487653159866429
-TICKET_LOG_CHANNEL = 1532488621699895396
+TICKET_LOG_CHANNEL = 1532501769706410075
 TICKET_COOLDOWN_S  = 120  # 2 minutes
 
 # Roles that can see every ticket
