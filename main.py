@@ -15,7 +15,7 @@ DATA_FILE      = "bot_state.json"
 intents                 = discord.Intents.all()
 intents.message_content = True
 
-bot            = commands.Bot(command_prefix="-", intents=intents)
+bot            = commands.Bot(command_prefix=BOT_PREFIX, intents=intents)
 bot.start_time = datetime.datetime.now(datetime.timezone.utc)
 
 # ─── STATE HELPERS ─────────────────────────────────────────────────────────────
@@ -79,7 +79,7 @@ async def on_ready():
             async with session.post(
                 f"https://discord.com/api/v10/channels/{LOG_CHANNEL_ID}/messages",
                 headers={"Authorization": f"Bot {token}", "Content-Type": "application/json"},
-                json={"content": "-# <@703059363312697404>  |  <@&1532239870792044544>"},
+                json={"content": "<@703059363312697404> The bot is back online."},
             ) as resp:
                 if resp.status not in (200, 201):
                     text = await resp.text()
