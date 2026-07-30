@@ -7,7 +7,7 @@ from discord.ext import commands
 
 
 # ─── CONFIG ────────────────────────────────────────────────────────────────────
-WELCOME_CHANNEL_ID = 1514076076370825266  # Replace with your welcome channel ID
+WELCOME_CHANNEL_ID = 1532239804719173737  # Replace with your welcome channel ID
 
 
 # ─── PAYLOAD ───────────────────────────────────────────────────────────────────
