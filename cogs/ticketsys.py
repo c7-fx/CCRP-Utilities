@@ -155,6 +155,7 @@ def ticket_panel_payload(ticket_type: str, description: str, proof_url: str | No
             "components": [{"type": 10, "content": "**Close Ticket**\n-# *Close the ticket with an optional reason*"}],
             "accessory": {
                 "style": 2, "type": 2,
+                "label": "Close",
                 "disabled": False,
                 "custom_id": "ticket_close"
             }
@@ -164,6 +165,7 @@ def ticket_panel_payload(ticket_type: str, description: str, proof_url: str | No
             "components": [{"type": 10, "content": "**Request Ticket Closure**\n-# *Request to close the ticket*"}],
             "accessory": {
                 "style": 2, "type": 2,
+                "label": "Request Close",
                 "disabled": False,
                 "custom_id": "ticket_request_close"
             }
@@ -430,6 +432,7 @@ class Tickets(commands.Cog):
         self.bot        = bot
         self.session: aiohttp.ClientSession | None = None
         self._cooldowns: dict[int, float] = {}
+        self._open_tickets: dict[int, list[int]] = {}  # user_id -> list of open channel ids
 
     async def cog_load(self):
         self.session = aiohttp.ClientSession()
@@ -490,13 +493,29 @@ class Tickets(commands.Cog):
         user  = interaction.user
         guild = interaction.guild
 
-        remaining = self.check_cooldown(user.id)
-        if remaining is not None:
-            await interaction.followup.send(
-                f"⏳ You're on cooldown. Please wait **{remaining:.0f}s** before opening another ticket.",
-                ephemeral=True,
-            )
-            return
+        # Staff bypass — no cooldown or ticket limit for staff
+        is_staff = any(r.id in STAFF_ROLE_IDS for r in getattr(user, "roles", []))
+
+        if not is_staff:
+            remaining = self.check_cooldown(user.id)
+            if remaining is not None:
+                await interaction.followup.send(
+                    f"You are on cooldown. Please wait **{remaining:.0f}s** before opening another ticket.",
+                    ephemeral=True,
+                )
+                return
+
+            # Ticket limit — max 2 open at once
+            open_ids = self._open_tickets.get(user.id, [])
+            # Prune any channels that no longer exist
+            open_ids = [cid for cid in open_ids if guild.get_channel(cid) is not None]
+            self._open_tickets[user.id] = open_ids
+            if len(open_ids) >= 2:
+                await interaction.followup.send(
+                    "You already have 2 open tickets. Please wait for one to be closed before opening another.",
+                    ephemeral=True,
+                )
+                return
 
         category  = guild.get_channel(TICKET_CATEGORY_ID)
         log_ch    = guild.get_channel(TICKET_LOG_CHANNEL)
@@ -547,7 +566,9 @@ class Tickets(commands.Cog):
             except RuntimeError as e:
                 print(f"[Tickets] Failed to send open log: {e}")
 
-        self.set_cooldown(user.id)
+        if not is_staff:
+            self.set_cooldown(user.id)
+        self._open_tickets.setdefault(user.id, []).append(ticket_ch.id)
         await interaction.followup.send(f"Your ticket has been opened: {ticket_ch.mention}", ephemeral=True)
 
     # ── Close ticket ───────────────────────────────────────────────────────────
