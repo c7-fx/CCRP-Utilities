@@ -84,12 +84,12 @@ def panel_payload(plrcount: int, max_players: int, queue: int, last_updated: str
                     {
                         "type": 10,
                         "content": (
-                            "<:Dot:1532564912306524220> Server polls, startups, and shutdowns are posted here, whenever the in-game server is about to start, going to start, and shutdown, you'll be notified inside of this channel. While the server is shutdown, please do not join the server.\n\n"
-                            "<:home:1532564913472409731>  ``Game Information:``\n"
+                            "<:Dot:1521024677492035804> Server polls, startups, and shutdowns are posted here, whenever the in-game server is about to start, going to start, and shutdown, you'll be notified inside of this channel. While the server is shutdown, please do not join the server.\n\n"
+                            "<:home:1517977032380907653>  ``Game Information:``\n"
                             "**Server Name:** Coast City Roleplay\n"
                             "**Server Owner:** BeanSypher\n"
                             "**Server Code:** CoastCtyRP\n\n"
-                            "<:controller:1532564654033997946> ``Ingame Information:``\n"
+                            "<:controller:1517977051867516979> ``Ingame Information:``\n"
                             f"**Playercount:** {plrcount} / {max_players}\n"
                             f"**Queue:** {queue}\n"
                             f"**Last Updated:** {last_updated}\n\n"
@@ -118,12 +118,12 @@ def panel_offline_payload() -> dict:
                     {
                         "type": 10,
                         "content": (
-                            "<:Dot:1532564912306524220> Server polls, startups, and shutdowns are posted here, whenever the in-game server is about to start, going to start, and shutdown, you'll be notified inside of this channel. While the server is shutdown, please do not join the server.\n\n"
-                            "<:home:1532564913472409731>  ``Game Information:``\n"
+                            "<:Dot:1521024677492035804> Server polls, startups, and shutdowns are posted here, whenever the in-game server is about to start, going to start, and shutdown, you'll be notified inside of this channel. While the server is shutdown, please do not join the server.\n\n"
+                            "<:home:1517977032380907653>  ``Game Information:``\n"
                             "**Server Name:** Coast City Roleplay\n"
                             "**Server Owner:** BeanSypher\n"
                             "**Server Code:** CoastCtyRP\n\n"
-                            "<:controller:1532564654033997946> ``Ingame Information:``\n"
+                            "<:controller:1517977051867516979> ``Ingame Information:``\n"
                             "**Playercount:** Unavailable\n"
                             "**Queue:** Unavailable\n"
                             f"**Last Updated:** {now}\n\n"
@@ -151,7 +151,7 @@ def vote_payload(votes: int, req_votes: int) -> dict:
                     {
                         "type": 10,
                         "content": (
-                            f"<:intermediate:1532564657699684442>  The **Coast City Roleplay** management team is looking to start a session. "
+                            f"<:intermediate:1516975224942497812>  The **Coast City Roleplay** management team is looking to start a session. "
                             f"In order for our server to go online we will need **{req_votes}** or more votes."
                         )
                     },
@@ -207,7 +207,7 @@ def session_start_payload(plrcount: int, voter_pings: str) -> dict:
                     {
                         "type": 10,
                         "content": (
-                            "<:online:1532564656403779703> The session vote reached our needed voting requirement to start our session. "
+                            "<:online:1516975251475529909> The session vote reached our needed voting requirement to start our session. "
                             "If you reacted during the voting period, you are required to join the session for **at least** 30 minutes. "
                             "Failure to do so will result in moderation.\n\n"
                             "**Server Name:** Coast City Roleplay\n"
@@ -250,7 +250,7 @@ def session_start_manual_payload(plrcount: int) -> dict:
                     {
                         "type": 10,
                         "content": (
-                            "<:online:1532564656403779703> A session has been started! "
+                            "<:online:1516975251475529909> A session has been started! "
                             "Join us and experience Coast City Roleplay.\n\n"
                             "**Server Name:** Coast City Roleplay\n"
                             "**Server Owner:** BeanSypher\n"
@@ -291,9 +291,9 @@ def session_low_payload(plrcount: int) -> dict:
                     {
                         "type": 10,
                         "content": (
-                            f"<:Dot:1532564912306524220> Our in-game server is sitting at **{plrcount}** players! "
+                            f"<:Dot:1521024677492035804> Our in-game server is sitting at **{plrcount}** players! "
                             "Come join and have some fantastic roleplays with us.\n\n"
-                            "<:home:1532564913472409731>  ``Game Information:``\n"
+                            "<:home:1517977032380907653>  ``Game Information:``\n"
                             "**Server Name:** Coast City Roleplay\n"
                             "**Server Owner:** BeanSypher\n"
                             "**Server Code:** CoastCtyRP"
@@ -319,7 +319,7 @@ def session_end_payload() -> dict:
                     {
                         "type": 10,
                         "content": (
-                            "<:offline:1532564655497674752> Our server is now offline, we will see you soon! "
+                            "<:offline:1516975248631664832> Our server is now offline, we will see you soon! "
                             "Please do not join the server whilst it is shutdown. "
                             "Keep an eye on this channel for the next session."
                         )
@@ -447,7 +447,11 @@ class Sessions(commands.Cog):
 
     # ── Trigger auto session start when votes hit goal ─────────────────────────
     async def trigger_session_start(self, channel: discord.TextChannel):
-        # Disable the vote embed
+        # Snapshot voters before resetting state
+        voter_ids    = list(self.voters.keys())
+        voter_pings  = " ".join(f"<@{uid}>" for uid in voter_ids)
+
+        # 1. Disable the vote embed
         if self.vote_message_id:
             try:
                 await self.raw_edit(
@@ -457,29 +461,40 @@ class Sessions(commands.Cog):
             except RuntimeError as e:
                 print(f"[Sessions] Failed to close vote embed: {e}")
 
-        # Fetch player count
-        info = await fetch_server(self.session)
+        # 2. Fetch live player count
+        info     = await fetch_server(self.session)
         plrcount = int(info.get("CurrentPlayers", 0)) if info else 0
 
-        # Build voter pings string
-        voter_pings = " ".join(f"<@{uid}>" for uid in self.voters)
+        # 3. Send plain text ping first (separate message so mentions actually fire)
+        #    Components V2 embeds can't use the content field, so pings must be standalone.
+        ping_line = f"@here <@&{SESSION_ROLE_ID}> {voter_pings}"
+        try:
+            ch = self.bot.get_channel(SESSION_CHANNEL_ID)
+            if ch:
+                await ch.send(
+                    ping_line,
+                    allowed_mentions=discord.AllowedMentions(
+                        everyone=True,
+                        roles=True,
+                        users=True,
+                    )
+                )
+        except Exception as e:
+            print(f"[Sessions] Failed to send session start pings: {e}")
 
-        # Post session start embed
+        # 4. Post the session start V2 embed (voter pings shown inside as subtext)
         payload = session_start_payload(plrcount, voter_pings)
-        payload["allowed_mentions"] = {
-            "parse": ["everyone", "roles"],
-            "users": [str(uid) for uid in self.voters]
-        }
+        payload["allowed_mentions"] = {"parse": []}  # pings already sent above
         try:
             await self.raw_send(SESSION_CHANNEL_ID, payload)
         except RuntimeError as e:
-            print(f"[Sessions] Failed to send session start: {e}")
+            print(f"[Sessions] Failed to send session start embed: {e}")
 
-        # Reset vote state
+        # 5. Reset vote state
         self.vote_message_id = None
         self.vote_channel_id = None
-        self.vote_req = 0
-        self.voters = {}
+        self.vote_req        = 0
+        self.voters          = {}
 
     # ── Interaction listener (vote buttons) ────────────────────────────────────
     @commands.Cog.listener()
@@ -506,22 +521,29 @@ class Sessions(commands.Cog):
                 self.voters[uid] = interaction.user
                 msg = "Your vote has been counted."
 
-            # Update vote embed
-            try:
-                await self.raw_edit(
-                    self.vote_channel_id, self.vote_message_id,
-                    vote_payload(len(self.voters), self.vote_req)
-                )
-            except RuntimeError as e:
-                print(f"[Sessions] Failed to update vote embed: {e}")
+            # Check if goal is reached BEFORE updating the embed
+            goal_reached = len(self.voters) >= self.vote_req
 
-            await self.raw_interaction_reply(interaction, {"flags": 64, "content": msg})
-
-            # Check if goal reached
-            if len(self.voters) >= self.vote_req:
+            if goal_reached:
+                # Acknowledge the interaction first, then handle the start flow
+                await self.raw_interaction_reply(interaction, {
+                    "flags": 64,
+                    "content": "Vote counted! The goal has been reached — starting the session."
+                })
                 channel = self.bot.get_channel(self.vote_channel_id)
                 if channel:
                     await self.trigger_session_start(channel)
+            else:
+                # Update the vote count on the embed
+                try:
+                    await self.raw_edit(
+                        self.vote_channel_id, self.vote_message_id,
+                        vote_payload(len(self.voters), self.vote_req)
+                    )
+                except RuntimeError as e:
+                    print(f"[Sessions] Failed to update vote embed: {e}")
+
+                await self.raw_interaction_reply(interaction, {"flags": 64, "content": msg})
 
         # ── View votes button ──
         elif cid == "session_vote_view":
@@ -589,7 +611,7 @@ class Sessions(commands.Cog):
             ch = self.bot.get_channel(SESSION_CHANNEL_ID)
             if ch:
                 await ch.send(
-                    f"-# @here <@&{SESSION_ROLE_ID}> <@&{STAFF_ROLE_ID}> — **A session vote has started! React to the vote embed to cast your vote.**",
+                    f"<@&{SESSION_ROLE_ID}> — a session vote has started!",
                     allowed_mentions=discord.AllowedMentions(roles=True)
                 )
         except Exception as e:
