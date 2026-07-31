@@ -589,7 +589,7 @@ class Sessions(commands.Cog):
             ch = self.bot.get_channel(SESSION_CHANNEL_ID)
             if ch:
                 await ch.send(
-                    f"<@&{SESSION_ROLE_ID}> — !",
+                    f"@here <@&{SESSION_ROLE_ID}> <@&{STAFF_ROLE_ID}> — A session vote has started! React to the vote embed to cast your vote.",
                     allowed_mentions=discord.AllowedMentions(roles=True)
                 )
         except Exception as e:
